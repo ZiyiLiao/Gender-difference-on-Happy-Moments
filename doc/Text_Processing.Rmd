@@ -81,7 +81,7 @@ word <- c("happy","ago","yesterday","lot","today","months","month",
                  "happier","happiest","last","week","past")
 
 stop_words <- stop_words %>%
-  bind_rows(mutate(tibble(word), lexicon = "updated"))
+  bind_rows(mutate(tibble(word), lexicon = "updated")) #add words in the stop_words and the level of lexicon is 'updated'
 ```
 
 ### Step 6 - Combining stems and dictionary into the same tibble
@@ -140,3 +140,4 @@ write_csv(hm_data, "../output/processed_moments.csv")
 ```
 
 The final processed data is ready to be used for any kind of analysis.
+
