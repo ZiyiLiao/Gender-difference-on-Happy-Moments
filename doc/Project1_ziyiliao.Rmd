@@ -4,8 +4,8 @@ author: "Ziyi Liao "
 output: html_notebook
 ---
 
-# Preprocess the data
-## Step 0: load the libraries 
+#Part 0: Clean the data
+##Step 1. load the libraries 
 ```{r load libraries, warning=FALSE, message=FALSE}
 library(tidyverse)
 library(tidytext)
@@ -23,11 +23,9 @@ library(tm)
 library(topicmodels)
 library(RColorBrewer)
 library(dplyr)
-
-library(leaflet)
 ```
 
-##Step 1:
+##Step 2: Process the data
 ```{r}
 hm_data <- read_csv("../output/processed_moments.csv")
 
@@ -53,68 +51,56 @@ happydb <- hm_data %>%
   filter(reflection_period %in% c("24h", "3m")) %>%
   mutate(reflection_period = fct_recode(reflection_period, 
                                         months_3 = "3m", hours_24 = "24h"))
-```
 
-
-
-## Merge the text data with demographic data into a CSV file
-```{r}
+# Merge the text data with demographic data into a CSV file
 write_csv(happydb, "../output/happydb.csv")
-```
-convert the structures of some variables
-```{r}
+
+#convert the structures of some variables
 happydb$age <- as.numeric(happydb$age)
 ```
 
+#Part 1: What's the difference of the words in each gender group?
+*In order to analyze the components of the text in each group, the barplot and wordcloud are used.*
 
-
-### Description
-```{r hmid/wid}
-length(unique(hm_data$hmid))
-length(unique(hm_data$wid))
-length(unique(happydb$wid))
-length(unique(hm_data$hmid))/length(unique(hm_data$wid))
-```
-All we have 10841 people sharing 100392 happy moments. On average, the each person shared 9.26 moments.
-
-
-##Step 1: Seperate the data set
-```{r}
+##Step 1 : Filter data
+```{r,warning=FALSE}
 female <- happydb %>%
   filter(gender == 'f') 
 male <- happydb %>%
   filter(gender == 'm')
-```
 
-
-##Step 2 : WordCloud of Part of Speech
-1.read the senselabe file
-```{r}
 urlfile<-'https://raw.githubusercontent.com/rit-public/HappyDB/master/happydb/data/senselabel.csv'
 sense_data <- read_csv(urlfile)
-```
-```{r warning=FALSE}
+
 #merge the data with lower case word
 # what's the most frequently used POS in the top freq words?
-head(freq_f)
 f_POS <- merge(freq_f,sense,by.x = 'word',by.y = 'lowercaseLemma')
 f_POS <- as.matrix(table(f_POS$POS))
 
 m_POS <- merge(freq_m,sense,by.x = 'word',by.y = 'lowercaseLemma')
 m_POS <- as.matrix(table(m_POS$POS))
+
+#combine the female data and male data
 POS <- rbind(m_POS,f_POS)
 POS <- data_frame(word = rownames(POS), nums= POS, gender = c(rep('male',12),rep('female',12)))
-POS
-  labs(title = 'POS of different gender', x = 'Part of Speech', y = 'Frequency')
-levels(factor(POS$gender))
-
-ggplot(POS, fill = 'pink')+
+```
+##Step 2: Barplot 
+```{r barplot}
+ggplot(POS)+
   geom_bar(aes(x = POS$word, y = POS$nums), stat="identity", fill = 'lightgreen') +
   facet_grid(~gender)+
   labs(titile = 'POS for different gender', x = 'Part of Speech', y = 'Frequency')
 
+# most frequently used 10 words for female
+ggplot(freq_f[1:10,], aes(fill = freq_f[1:10,]$word)) +
+  geom_bar(aes(x = reorder(freq_f[1:10,]$word, -freq_f[1:10,]$Freq), y = freq_f[1:10,]$Freq), stat="identity", fill = 'pink')+
+  labs(title='Most Frequently Used 10 Words For Female', y = 'Frequency', x = 'Words')
+
+# most frequently used 10 words for male
+ggplot(freq_m[1:10,], aes(fill = freq_m[1:10,]$word)) +
+  geom_bar(aes(x = reorder(freq_m[1:10,]$word,-freq_m[1:10,]$Freq), y = freq_m[1:10,]$Freq), stat="identity", fill = 'skyblue')+
+  labs(title='Most Frequently Used 10 Words For Male', y = 'Frequency', x = 'Words')
 ```
-The result shows that both male and female like use nouns and adjs to express the happy moments.
 
 ##Step 3: WordCloud of text word
 ```{r reorganize data, warning=FALSE}
@@ -128,26 +114,129 @@ male_dtm <- DocumentTermMatrix(male_corpus)
 freq_m <- data.frame(sort(colSums(as.matrix(male_dtm)), decreasing =TRUE))
 freq_m <- data.frame(word = rownames(freq_m), Freq = freq_m[,1])
 ```
-```{r barplot}
-# most frequently used 10 words for female
-ggplot(freq_f[1:10,], aes(fill = freq_f[1:10,]$word)) +
-  geom_bar(aes(x = freq_f[1:10,]$word, y = freq_f[1:10,]$Freq), stat="identity", fill = 'pink')+
-  labs(title='Most Frequently Used 10 Words For Female', y = 'Frequency', x = 'Words')
-# most frequently used 10 words for male
-ggplot(freq_m[1:10,], aes(fill = freq_m[1:10,]$word)) +
-  geom_bar(aes(x = freq_m[1:10,]$word, y = freq_m[1:10,]$Freq), stat="identity", fill = 'skyblue')+
-  labs(title='Most Frequently Used 10 Words For Mmale', y = 'Frequency', x = 'Words')
-```
 ```{r wordcloud}
 colorVec_f = rep(c('red', 'lightpink'), length.out=nrow(freq_f))
-wordcloud2(freq_f[1:400,], color = colorVec_f, fontWeight = "bold",size=0.5, shape = 'cardioid', rotateRatio = 0.2)
+wordcloud2(freq_f[1:100,], color = colorVec_f, fontWeight = "bold",size=0.5, shape = 'cardioid', rotateRatio = 0.2)
 
 colorVec_m = rep(c('blue', 'skyblue'), length.out=nrow(freq_m))
-wordcloud2(freq_m[1:400,], color = colorVec_m, fontWeight = "bold",size=0.5, shape = 'star', rotateRatio = 0.2)
+wordcloud2(freq_m[1:100,], color = colorVec_m, fontWeight = "bold",size=0.5, shape = 'star', rotateRatio = 0.2)
 ```
 
-In the barplot and wordcloud graphs of both female and male, we can find that both women and men are enjoyed the happy moments with their friends. And women tend to be more bond with people around them for the words like husband, daughter, son, family come up more frequently than men's.
+##Summary
+The barplots show that both male and female like use nouns, verbs and adjs to express the happy moments. The top 10 words of frequency in each groups also support the notation. Women have 8 nouns and 2 verbs and man have 7 nouns, 2 verbs and 1 adverb(finally).
 
-##Step 4: Periods
+In the barplot and wordcloud graphs of both female and male, we can find that both women and men are enjoyed the happy moments with their friends. But women tend to be more bond with people around them for the words like husband, daughter, son, family come up more frequently than men's. 
+
+
+
+# Part 2: What the difference of periods in each gender group?
+*For the infomation of the difference in the numbers and contents of periods in each gender group, I'm gonna use the number count, word cloud and ks-test.*
+
+## Step 1. Numbers of reflection
+```{r}
+ggplot(happydb,aes(x = happydb$gender,fill = happydb$reflection_period))+
+  geom_bar(position = "fill") +
+  labs(title = 'Reflection Period of Different Gender', x = 'Gender')
+```
+
+## Step 2. Part of Position of Reflection
+```{r}
+f24h_POS <- merge(freq_f24h,sense,by.x = 'word',by.y = 'lowercaseLemma')
+f24h_POS <- as.matrix(table(f24h_POS$POS))
+
+f3m_POS <- merge(freq_f3m,sense,by.x = 'word',by.y = 'lowercaseLemma')
+f3m_POS <- as.matrix(table(f3m_POS$POS))
+
+m24h_POS <- merge(freq_m24h,sense,by.x = 'word',by.y = 'lowercaseLemma')
+m24h_POS <- as.matrix(table(m24h_POS$POS))
+m3m_POS <- merge(freq_m3m,sense,by.x = 'word',by.y = 'lowercaseLemma')
+m3m_POS <- as.matrix(table(m3m_POS$POS))
+
+#combine the female data and male data
+f.POS <- cbind(f24h_POS,f3m_POS)
+f.POS <- data_frame(word = rownames(f.POS), nums= f.POS, period = c(rep('24h',12),rep('3m',12)))
+
+m.POS <- cbind(m24h_POS,m3m_POS)
+m.POS <- data_frame(word = rownames(m.POS), nums= m.POS, period = c(rep('24h',12),rep('3m',12)))
+
+#use the ks.test
+ks.test(f.POS[,1],f.POS[,2]);ks.test(m.POS[,1],m.POS[,2])
+```
+
+## Step 3. Words of Reflection
+```{r}
+# filter all the data set
+female_24h <- female %>%
+  filter(reflection_period == 'hours_24') # female & 24h
+male_24h <- male %>%
+  filter(reflection_period == 'hours_24') # male & 24h
+female_3m <- female %>%
+  filter(reflection_period == 'months_3') # female & 3m
+male_3m <- male %>%
+  filter(reflection_period == 'months_3') # male & 3m
+```
+```{r}
+# 24h happy moments of female
+f24h_corpus <- Corpus(VectorSource(female_24h$text))
+f24h_dtm <- DocumentTermMatrix(f24h_corpus)
+freq_f24h <- data.frame(sort(colSums(as.matrix(f24h_dtm)), decreasing =TRUE))
+freq_f24h <- data.frame(word = rownames(freq_f24h), Freq = freq_f24h[,1])
+colorVec1 <- rep(c('palevioletred', 'hotpink'), length.out=nrow(freq_f24h))
+wordcloud2(freq_f24h[3:100,], color = colorVec1, fontWeight = "bold",size=0.5, rotateRatio = 0.2)  
+# 3m happy moments of female
+f3m_corpus <- Corpus(VectorSource(female_3m$text))
+f3m_dtm <- DocumentTermMatrix(f3m_corpus)
+freq_f3m <- data.frame(sort(colSums(as.matrix(f3m_dtm)), decreasing =TRUE))
+freq_f3m <- data.frame(word = rownames(freq_f3m), Freq = freq_f3m[,1])
+colorVec2 <- rep(c('palevioletred', 'hotpink'), length.out=nrow(freq_f3m))
+wordcloud2(freq_f3m[3:100,], color = colorVec2, fontWeight = "bold",size=0.5, rotateRatio = 0.2)
+# 24h happy moments of male
+m24h_corpus <- Corpus(VectorSource(male_24h$text))
+m24h_dtm <- DocumentTermMatrix(m24h_corpus)
+freq_m24h <- data.frame(sort(colSums(as.matrix(m24h_dtm)), decreasing =TRUE))
+freq_m24h <- data.frame(word = rownames(freq_m24h), Freq = freq_m24h[,1])
+colorVec3 <- rep(c('cornflowerblue','skyblue'), length.out=nrow(freq_m24h))
+wordcloud2(freq_m24h[3:100,], color = colorVec3, fontWeight = "bold",size=0.5, rotateRatio = 0.2)  
+# 3m happy moments of male
+m3m_corpus <- Corpus(VectorSource(male_3m$text))
+m3m_dtm <- DocumentTermMatrix(m3m_corpus)
+freq_m3m <- data.frame(sort(colSums(as.matrix(m3m_dtm)), decreasing =TRUE))
+freq_m3m <- data.frame(word = rownames(freq_m3m), Freq = freq_m3m[,1])
+colorVec4 <- rep(c('cornflowerblue','skyblue'), length.out=nrow(freq_m24h))
+wordcloud2(freq_m3m[3:100,], color = colorVec4, fontWeight = "bold",size=0.5, rotateRatio = 0.2)
+```
+
+##Summary 
+For both female and male, there is no difference in the total number of the reflection period. But with the content of each period, female and male show differently.
+
+Since the p-values of Kolmogorov-Smirnov test are very close to 1, the null hypothesis cannot be rejected at 0.01 significance which means there is no statistically difference between the POS of 24 hours and that of 3 months in each gender group.
+
+After removing the most frequently used words in each group, the results show that in 24-hour's memory, women have more 'fleeting' words - words describing movement, such as watched, feel, enjoy, ect. In 3-month's memory, women have more nouns describing the person they shared the happy moments with. This is compatible with the memory loss. But focusing on men's words in different reflection period, the POS of the words seem remain.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
