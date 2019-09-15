@@ -1,7 +1,0 @@
----
-title: "Project 1"
-author: "Ziyi Liao "
-output: html_notebook
----
-
-
