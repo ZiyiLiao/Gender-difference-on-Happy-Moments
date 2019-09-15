@@ -1,7 +1,9 @@
 ---
 title: "Project 1"
-author: "Ziyi Liao "
-output: html_notebook
+author: 'Ziyi Liao '
+output:
+  pdf_document: default
+  html_notebook: default
 ---
 
 ##Part 0: Clean the data
@@ -13,17 +15,17 @@ library(DT)
 library(scales)
 library(wordcloud2)
 library(gridExtra)
-library(wordcloud)
 library(tm)
 library(topicmodels)
 library(plyr)
 library(dplyr)
 library(syuzhet)
+library(ngram)
 ```
 
 ####Step 2: Process the data
 ```{r message=FALSE, warning=FALSE}
-hm_data <- read_csv("../output/processed_moments.csv")
+hm_data <- read_csv("../data/output/processed_moments.csv")
 
 urlfile<-'https://raw.githubusercontent.com/rit-public/HappyDB/master/happydb/data/demographic.csv'
 demo_data <- read_csv(urlfile)
@@ -36,7 +38,7 @@ happydb <- hm_data %>%
          marital, 
          parenthood,
          reflection_period,
-         age, https://github.com/
+         age,
          country, 
          ground_truth_category, 
          text) %>%
@@ -49,7 +51,8 @@ happydb <- hm_data %>%
                                         months_3 = "3m", hours_24 = "24h"))
 
 #Merge the text data with demographic data into a CSV file
-write_csv(happydb, "../output/happydb.csv")
+write_csv(happydb, "../data/output/happydb.csv")
+#happydb = read.csv("../data/output/happydb.csv")
 
 #convert the structures of some variables
 happydb$age <- as.numeric(happydb$age)
@@ -68,18 +71,20 @@ male <- happydb %>%
 
 urlfile<-'https://raw.githubusercontent.com/rit-public/HappyDB/master/happydb/data/senselabel.csv'
 sense_data <- read_csv(urlfile)
-
 ```
 ```{r reorganize data, warning=FALSE}
-female_corpus <- Corpus(VectorSource(female$text))
-female_dtm <- DocumentTermMatrix(female_corpus)
-freq_f <- data.frame(sort(colSums(as.matrix(female_dtm)), decreasing =TRUE))
-freq_f <- data.frame(word = rownames(freq_f), Freq = freq_f[,1])
+freq_f<- Corpus(VectorSource(female$text)) %>%
+  DocumentTermMatrix() %>%
+  as.matrix() %>% colSums() %>% data.frame()
+freq_f <- order(freq_f$., decreasing = T) %>%
+  data.frame(word = rownames(freq_f)[.], Freq = freq_f[.,])
 
-male_corpus <- Corpus(VectorSource(male$text))
-male_dtm <- DocumentTermMatrix(male_corpus)
-freq_m <- data.frame(sort(colSums(as.matrix(male_dtm)), decreasing =TRUE))
-freq_m <- data.frame(word = rownames(freq_m), Freq = freq_m[,1])
+
+freq_m <- Corpus(VectorSource(male$text)) %>%
+  DocumentTermMatrix() %>%
+  as.matrix() %>% colSums() %>% data.frame()
+freq_m <- order(freq_m$., decreasing = T) %>%
+  data.frame(word = rownames(freq_m)[.], Freq = freq_m[.,])
 ```
 ```{r warning=FALSE}
 #merge the data with lower case word
@@ -94,10 +99,11 @@ m_POS <- as.matrix(table(m_POS$POS))
 POS <- rbind(m_POS,f_POS)
 POS <- data_frame(word = rownames(POS), nums= POS, gender = c(rep('male',12),rep('female',12)))
 ```
+
 ####Step 2: Barplot 
 ```{r barplot of POS}
 ggplot(POS)+
-  geom_bar(aes(x = POS$word, y = POS$nums), stat="identity", fill = 'lightgreen') +
+  geom_bar(aes(x = POS$word, y = POS$nums), stat="identity", fill = 'darkseagreen') +
   facet_grid(~gender)+
   labs(titile = 'POS for different gender', x = 'Part of Speech', y = 'Frequency')
 
@@ -115,10 +121,10 @@ ggplot(freq_m[1:10,], aes(fill = freq_m[1:10,]$word)) +
 ####Step 3: WordCloud of text word
 ```{r wordcloud}
 colorVec_f = rep(c('red', 'lightpink'), length.out=nrow(freq_f))
-wordcloud2(freq_f[1:100,], color = colorVec_f, fontWeight = "bold",size=0.5, shape = 'cardioid', rotateRatio = 0.2)
+wordcloud2(freq_f[1:100,2:3], color = colorVec_f, fontWeight = "bold",size=0.5, shape = 'cardioid', rotateRatio = 0.2)
 
 colorVec_m = rep(c('blue', 'skyblue'), length.out=nrow(freq_m))
-wordcloud2(freq_m[1:100,], color = colorVec_m, fontWeight = "bold",size=0.5, shape = 'star', rotateRatio = 0.2)
+wordcloud2(freq_m[1:100,2:3], color = colorVec_m, fontWeight = "bold",size=0.5, shape = 'star', rotateRatio = 0.2)
 ```
 
 ####Summary
@@ -141,33 +147,38 @@ ggplot(happydb,aes(x = happydb$gender,fill = happydb$reflection_period))+
 # filter all the data set
 female_24h <- female %>%
   filter(reflection_period == 'hours_24') # female & 24h
-f24h_corpus <- Corpus(VectorSource(female_24h$text))
-f24h_dtm <- DocumentTermMatrix(f24h_corpus)
-freq_f24h <- data.frame(sort(colSums(as.matrix(f24h_dtm)), decreasing =TRUE))
-freq_f24h <- data.frame(word = rownames(freq_f24h), Freq = freq_f24h[,1])
+freq_f24h <- Corpus(VectorSource(female_24h$text)) %>%
+  DocumentTermMatrix() %>%
+  as.matrix() %>% colSums() %>% data.frame()
+freq_f24h <- order(freq_f24h$., decreasing = T) %>%
+  data.frame(word = rownames(freq_f24h)[.], Freq = freq_f24h[.,])
 
 female_3m <- female %>%
   filter(reflection_period == 'months_3') # female & 3m
-f3m_corpus <- Corpus(VectorSource(female_3m$text))
-f3m_dtm <- DocumentTermMatrix(f3m_corpus)
-freq_f3m <- data.frame(sort(colSums(as.matrix(f3m_dtm)), decreasing =TRUE))
-freq_f3m <- data.frame(word = rownames(freq_f3m), Freq = freq_f3m[,1])
+freq_f3m <- Corpus(VectorSource(female_3m$text)) %>% 
+  DocumentTermMatrix() %>%
+  as.matrix() %>% colSums() %>%  data.frame()
+freq_f3m <- order(freq_f3m$., decreasing = T) %>%
+  data.frame(word = rownames(freq_f3m)[.], Freq = freq_f3m[.,])
+```
 
+```{r}
 male_24h <- male %>%
   filter(reflection_period == 'hours_24') # male & 24h
-m24h_corpus <- Corpus(VectorSource(male_24h$text))
-m24h_dtm <- DocumentTermMatrix(m24h_corpus)
-freq_m24h <- data.frame(sort(colSums(as.matrix(m24h_dtm)), decreasing =TRUE))
-freq_m24h <- data.frame(word = rownames(freq_m24h), Freq = freq_m24h[,1])
-
+freq_m24h <- Corpus(VectorSource(male_24h$text)) %>% 
+  DocumentTermMatrix() %>%
+  as.matrix() %>% colSums() %>% data.frame()
+freq_m24h <- order(freq_m24h$., decreasing = T) %>%
+  data.frame(word = rownames(freq_m24h)[.], Freq = freq_m24h[.,])
 male_3m <- male %>%
   filter(reflection_period == 'months_3') # male & 3m
-m3m_corpus <- Corpus(VectorSource(male_3m$text))
-m3m_dtm <- DocumentTermMatrix(m3m_corpus)
-freq_m3m <- data.frame(sort(colSums(as.matrix(m3m_dtm)), decreasing =TRUE))
-freq_m3m <- data.frame(word = rownames(freq_m3m), Freq = freq_m3m[,1])
-
+freq_m3m <- Corpus(VectorSource(male_3m$text)) %>% 
+  DocumentTermMatrix() %>%
+  as.matrix() %>% colSums() %>% data.frame()
+freq_m3m <- order(freq_m3m$., decreasing = T) %>%
+  data.frame(word = rownames(freq_m3m)[.], Freq = freq_m3m[.,])
 ```
+
 ```{r, warning=FALSE}
 f24h_POS <- merge(freq_f24h,sense_data,by.x = 'word',by.y = 'lowercaseLemma')
 f24h_POS <- as.matrix(table(f24h_POS$POS))
@@ -194,17 +205,17 @@ ks.test(f.POS[,1],f.POS[,2]);ks.test(m.POS[,1],m.POS[,2])
 ```{r}
 # 24h happy moments of female
 colorVec1 <- rep(c('palevioletred', 'hotpink'), length.out=nrow(freq_f24h))
-wordcloud2(freq_f24h[3:100,], color = colorVec1, fontWeight = "bold",size=0.5, rotateRatio = 0.2) 
+wordcloud2(freq_f24h[3:100,2:3], color = colorVec1, fontWeight = "bold",size=0.5, rotateRatio = 0.2) 
 # 3m happy moments of female
 colorVec2 <- rep(c('palevioletred', 'hotpink'), length.out=nrow(freq_f3m))
-wordcloud2(freq_f3m[3:100,], color = colorVec2, fontWeight = "bold",size=0.5, rotateRatio = 0.2)
+wordcloud2(freq_f3m[3:100,2:3], color = colorVec2, fontWeight = "bold",size=0.5, rotateRatio = 0.2)
 
 # 24h happy moments of male
 colorVec3 <- rep(c('cornflowerblue','skyblue'), length.out=nrow(freq_m24h))
-wordcloud2(freq_m24h[3:100,], color = colorVec3, fontWeight = "bold",size=0.5, rotateRatio = 0.2)  
+wordcloud2(freq_m24h[3:100,2:3], color = colorVec3, fontWeight = "bold",size=0.5, rotateRatio = 0.2)  
 # 3m happy moments of male
 colorVec4 <- rep(c('cornflowerblue','skyblue'), length.out=nrow(freq_m24h))
-wordcloud2(freq_m3m[3:100,], color = colorVec4, fontWeight = "bold",size=0.5, rotateRatio = 0.2)
+wordcloud2(freq_m3m[3:100,2:3], color = colorVec4, fontWeight = "bold",size=0.5, rotateRatio = 0.2)
 ```
 
 ####Summary 
@@ -219,7 +230,7 @@ After removing the most frequently used words in each group, the results show th
 It takes really long time to process whole data, so let's just take a sample of it. In this part, the get_nrc_sentiment,get_sent_value, barplot and ks.test will be used.
 ####Step 1. Get NRC sentiment
 ```{r, warning =FALSE, message=FALSE}
-sense <- read_csv('../doc/sense.csv')
+sense <- read_csv('../data/sense.csv')
 ```
 ```{r plot = TRUE}
 sense_f <- sense %>%
@@ -238,14 +249,16 @@ index2 <- sample(1:nrow(sense_m), 1000)
 sense_m_samps <- sense_m[index2,]
 gns_m <- get_nrc_sentiment(sense_m_samps$lowercaseLemma)
 sense_m_count <- apply(gns_m,2,sum)
+
+
 # Combine them together
 sense_count <- data_frame(sense = rep(names(sense_f_count),2), count = c(sense_f_count, sense_m_count), gender = c(rep('female', length(sense_f_count)), rep('male',length(sense_m_count))))
-
 ```
+
 ####Step 2. Draw plots
 ```{r barplot}
 ggplot(sense_count) +
-  geom_bar(aes(x = reorder(sense_count$sense,-sense_count$count), y = sense_count$count), stat="identity", fill = 'lightgreen')+
+  geom_bar(aes(x = reorder(sense_count$sense,-sense_count$count), y = sense_count$count), stat="identity", fill = 'darkseagreen')+
   facet_grid(~gender)+
   labs(title='Sense of the Happy Moment', y = 'Frequency', x = 'Sense')
 ```
