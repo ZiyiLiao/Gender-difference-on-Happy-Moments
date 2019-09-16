@@ -3,7 +3,8 @@
 This project is based on an crowd-sourced dataset [HappyDB](https://rit-public.github.io/HappyDB/). Generally, it helps answer the following questions in order to get some insights of the gender difference on happy moments:
 
 ```
-The *data* file is stored the data used in the project.
+The data file is stored the data used in the project.
+The doc file is stored the code used in the project.
 ```
 
 
