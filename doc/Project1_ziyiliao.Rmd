@@ -2,18 +2,18 @@
 title: "Project 1"
 author: 'Ziyi Liao '
 output:
-  pdf_document: default
   html_notebook: default
+  pdf_document: default
 ---
 
-##Part 0: Clean the data
-####Step 1. load the libraries 
+## Part 0: Clean the data
+#### Step 1. load the libraries 
 ```{r load libraries, warning=FALSE, message=FALSE}
 library(tidyverse)
 library(tidytext)
 library(DT)
 library(scales)
-library(wordcloud2)
+
 library(gridExtra)
 library(tm)
 library(topicmodels)
@@ -21,9 +21,11 @@ library(plyr)
 library(dplyr)
 library(syuzhet)
 library(ngram)
+library(devtools)
+library(wordcloud2)
 ```
 
-####Step 2: Process the data
+#### Step 2: Process the data
 ```{r message=FALSE, warning=FALSE}
 hm_data <- read_csv("../data/output/processed_moments.csv")
 
@@ -60,9 +62,9 @@ happydb$age <- as.numeric(happydb$age)
 
 
 
-##Part 1: What's the difference of the words in each gender group?
+## Part 1: What's the difference of the words in each gender group?
 In order to analyze the components of the text in each group, the barplot and wordcloud are used.
-####Step 1 : Filter data
+#### Step 1 : Filter data
 ```{r,warning=FALSE}
 female <- happydb %>%
   filter(gender == 'f') 
@@ -100,7 +102,7 @@ POS <- rbind(m_POS,f_POS)
 POS <- data_frame(word = rownames(POS), nums= POS, gender = c(rep('male',12),rep('female',12)))
 ```
 
-####Step 2: Barplot 
+#### Step 2: Barplot 
 ```{r barplot of POS}
 ggplot(POS)+
   geom_bar(aes(x = POS$word, y = POS$nums), stat="identity", fill = 'darkseagreen') +
@@ -118,31 +120,32 @@ ggplot(freq_m[1:10,], aes(fill = freq_m[1:10,]$word)) +
   labs(title='Most Frequently Used 10 Words For Male', y = 'Frequency', x = 'Words')
 ```
 
-####Step 3: WordCloud of text word
+#### Step 3: WordCloud of text word
 ```{r wordcloud}
 colorVec_f = rep(c('red', 'lightpink'), length.out=nrow(freq_f))
 wordcloud2(freq_f[1:100,2:3], color = colorVec_f, fontWeight = "bold",size=0.5, shape = 'cardioid', rotateRatio = 0.2)
-
+```
+```{r}
 colorVec_m = rep(c('blue', 'skyblue'), length.out=nrow(freq_m))
 wordcloud2(freq_m[1:100,2:3], color = colorVec_m, fontWeight = "bold",size=0.5, shape = 'star', rotateRatio = 0.2)
 ```
 
-####Summary
+#### Summary
 The barplots show that both male and female like use nouns, verbs and adjs to express the happy moments. The top 10 words of frequency in each groups also support the notation. Women have 8 nouns and 2 verbs and man have 7 nouns, 2 verbs and 1 adverb(finally).
 
 In the barplot and wordcloud graphs of both female and male, we can find that both women and men are enjoyed the happy moments with their friends. But women tend to be more bond with people around them for the words like husband, daughter, son, family come up more frequently than men's. 
 
 
-##Part 2: What's the difference of the periods in each gender group?
+## Part 2: What's the difference of the periods in each gender group?
 For the infomation of the difference in the numbers and contents of periods in each gender group, I'm gonna use the number count, word cloud and ks-test.
-####Step 1. Numbers of reflection
+#### Step 1. Numbers of reflection
 ```{r}
 ggplot(happydb,aes(x = happydb$gender,fill = happydb$reflection_period))+
   geom_bar(position = "fill") +
   labs(title = 'Reflection Period of Different Gender', x = 'Gender')
 ```
 
-####Step 2. Part of Position of Reflection
+#### Step 2. Part of Position of Reflection
 ```{r}
 # filter all the data set
 female_24h <- female %>%
@@ -201,24 +204,29 @@ m.POS <- cbind(m24h_POS,m3m_POS)
 ks.test(f.POS[,1],f.POS[,2]);ks.test(m.POS[,1],m.POS[,2])
 ```
 
-####Step 3. Words of Reflection
+#### Step 3. Words of Reflection
 ```{r}
 # 24h happy moments of female
 colorVec1 <- rep(c('palevioletred', 'hotpink'), length.out=nrow(freq_f24h))
 wordcloud2(freq_f24h[3:100,2:3], color = colorVec1, fontWeight = "bold",size=0.5, rotateRatio = 0.2) 
+```
+```{r}
 # 3m happy moments of female
 colorVec2 <- rep(c('palevioletred', 'hotpink'), length.out=nrow(freq_f3m))
 wordcloud2(freq_f3m[3:100,2:3], color = colorVec2, fontWeight = "bold",size=0.5, rotateRatio = 0.2)
-
+```
+```{r}
 # 24h happy moments of male
 colorVec3 <- rep(c('cornflowerblue','skyblue'), length.out=nrow(freq_m24h))
 wordcloud2(freq_m24h[3:100,2:3], color = colorVec3, fontWeight = "bold",size=0.5, rotateRatio = 0.2)  
+```
+```{r}
 # 3m happy moments of male
 colorVec4 <- rep(c('cornflowerblue','skyblue'), length.out=nrow(freq_m24h))
 wordcloud2(freq_m3m[3:100,2:3], color = colorVec4, fontWeight = "bold",size=0.5, rotateRatio = 0.2)
 ```
 
-####Summary 
+#### Summary 
 For both female and male, there is no difference in the total number of the reflection period. But with the content of each period, female and male show differently.
 
 Since the p-values of Kolmogorov-Smirnov test are very close to 1, the null hypothesis cannot be rejected at 0.01 significance which means there is no statistically difference between the POS of 24 hours and that of 3 months in each gender group.
@@ -226,9 +234,9 @@ Since the p-values of Kolmogorov-Smirnov test are very close to 1, the null hypo
 After removing the most frequently used words in each group, the results show that in 24-hour's memory, women have more 'fleeting' words - words describing movement, such as watched, feel, enjoy, ect. In 3-month's memory, women have more nouns describing the person they shared the happy moments with. This is compatible with the memory loss. But focusing on men's words in different reflection period, the POS of the words seem remain.
 
 
-##Part 3: Get Sentiment
+## Part 3: Get Sentiment
 It takes really long time to process whole data, so let's just take a sample of it. In this part, the get_nrc_sentiment,get_sent_value, barplot and ks.test will be used.
-####Step 1. Get NRC sentiment
+#### Step 1. Get NRC sentiment
 ```{r, warning =FALSE, message=FALSE}
 sense <- read_csv('../data/sense.csv')
 ```
@@ -255,7 +263,7 @@ sense_m_count <- apply(gns_m,2,sum)
 sense_count <- data_frame(sense = rep(names(sense_f_count),2), count = c(sense_f_count, sense_m_count), gender = c(rep('female', length(sense_f_count)), rep('male',length(sense_m_count))))
 ```
 
-####Step 2. Draw plots
+#### Step 2. Draw plots
 ```{r barplot}
 ggplot(sense_count) +
   geom_bar(aes(x = reorder(sense_count$sense,-sense_count$count), y = sense_count$count), stat="identity", fill = 'darkseagreen')+
@@ -279,7 +287,7 @@ ggplot(data = sent_value_m)+
   labs(title = 'Male', x = 'Values of Sentiment')
 ```
 
-####Step 3. KS test
+#### Step 3. KS test
 ```{r}
 #ks.test of numbers of nrc sentiment of each group
 ks.test(sense_count$count[sense_count$gender == 'female'], sense_count$count[sense_count$gender == 'male'])
@@ -288,10 +296,10 @@ ks.test(sense_count$count[sense_count$gender == 'female'], sense_count$count[sen
 ks.test(sent_value_f$V1,sent_value_m$V1)
 ```
 
-####Summary
+#### Summary
 Both female and male use more positive words than negative words to express their happy moments. For the sense of words, the words which show joy and anticipation are more likely used for happy moments. The histogram shows both mean of the sentiment values are concerntrated on 0. Under the ks.test, there is no significantly difference between the sense used by women and that by man. 
 
-##Part 4: Conclusion
+## Part 4: Conclusion
 From the analysis above, we can firstly know that the happy moments are mostly postive which is confirmed with the name of the research 'Happy Moments'. Both women and men used nouns, verbs and adjectives to express their happy moments. Besides, women like to remember the people who spent the happy moments with them but men don't show the tendency.
 
 There is no statistically difference between the numbers of happy moments of different period in each gender group.But the content of the word used by females and males show difference. Women tends to use verbs or adjectives to describe their happy moment in short-term memories, more nouns for discription in longer-term memories while men don't show the same tendency.
