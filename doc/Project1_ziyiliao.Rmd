@@ -19,6 +19,7 @@ library(readr)
 library(stringr)
 library(scales)
 library(tidytext)
+library(textdata)
 ```
 
 ```{r load libraries, warning=FALSE, message=FALSE}
@@ -210,7 +211,25 @@ pos_m %>%
 #### Sentiment Analysis
 
 ```{r}
+# obtained sentiment
+nrc = get_sentiments("nrc")
+library(syuzhet)
+# add a new column counting the difference between positive word count with negative word count
 
+female_text %>%  left_join(bing, by = "word")  %>% count(word,sentiment) %>% spread(sentiment, n ,fill = 0) %>% mutate(sentiment = positive - negative)
+
+male_sentiment <- male_text %>%  inner_join(nrc, by = "word")  %>% count(word , sentiment) %>% spread(sentiment, n ,fill = 0) %>% mutate(sentiment = positive - negative)
+```
+```{r}
+male_sentiment
+```
+
+
+* Plot trajectory of each gender
+```{r}
+ggplot(female_sentiment, aes(word,sentiment, fill = word)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~word, ncol = 2, scales = "free_x")
 ```
 
 
