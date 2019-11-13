@@ -8,6 +8,13 @@ output:
 
 ## Part 0: Clean the data
 #### Step 1. load the libraries 
+```{r}
+library(tidytext)
+library(tm)
+library(dplyr)
+library(ggplot2)
+```
+
 ```{r load libraries, warning=FALSE, message=FALSE}
 library(tidyverse)
 library(tidytext)
@@ -73,20 +80,79 @@ male <- happydb %>%
 
 urlfile<-'https://raw.githubusercontent.com/rit-public/HappyDB/master/happydb/data/senselabel.csv'
 sense_data <- read_csv(urlfile)
+sense_data
 ```
+
+* Remove Stopwords
+```{r}
+data("stop_words")
+
+word <- c("happy","ago","yesterday","lot","today","months","month",
+                 "happier","happiest","last","week","past","day")
+
+stop_words <- stop_words %>%
+  bind_rows(mutate(tibble(word), lexicon = "updated"))
+```
+```{r}
+# females' answer word cleaning
+female_text <- female$text %>% as.vector()  %>% 
+  tibble(text = .) %>% 
+  unnest_tokens(word, text) %>% 
+  anti_join(stop_words)
+freq_f <- female_text %>% count(word, sort = TRUE) # count frequency and sort by descending order
+
+# males' answer word cleaning
+male_text <- male$text %>% as.vector()  %>% 
+  tibble(text = .) %>% 
+  unnest_tokens(word, text) %>% 
+  anti_join(stop_words)
+freq_m <- male_text %>% count(word, sort = TRUE) # count frequency and sort by descending order
+```
+```{r}
+# visualize the frequency
+freq_f %>%
+  filter(n > 1500) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) +
+  geom_col(colour = "pink") +
+  xlab(NULL) +
+  coord_flip()
+
+freq_m %>%
+  filter(n > 1500) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n)) +
+  geom_col(colour = "skyblue") +
+  xlab(NULL) +
+  coord_flip()
+```
+```{r}
+ggplot(frequency, aes(x = proportion, y = `Jane Austen`, color = abs(`Jane Austen` - proportion))) +
+  geom_abline(color = "gray40", lty = 2) +
+  geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
+  geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
+  scale_x_log10(labels = percent_format()) +
+  scale_y_log10(labels = percent_format()) +
+  scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "gray75") +
+  facet_wrap(~author, ncol = 2) +
+  theme(legend.position="none") +
+  labs(y = "Jane Austen", x = NULL)
+```
+
+
 ```{r reorganize data, warning=FALSE}
-freq_f<- Corpus(VectorSource(female$text)) %>%
-  DocumentTermMatrix() %>%
-  as.matrix() %>% colSums() %>% data.frame()
-freq_f <- order(freq_f$., decreasing = T) %>%
-  data.frame(word = rownames(freq_f)[.], Freq = freq_f[.,])
-
-
-freq_m <- Corpus(VectorSource(male$text)) %>%
-  DocumentTermMatrix() %>%
-  as.matrix() %>% colSums() %>% data.frame()
-freq_m <- order(freq_m$., decreasing = T) %>%
-  data.frame(word = rownames(freq_m)[.], Freq = freq_m[.,])
+# freq_f<- Corpus(VectorSource(female$text)) %>%
+#   DocumentTermMatrix() %>%
+#   as.matrix() %>% colSums() %>% data.frame()
+# freq_f <- order(freq_f$., decreasing = T) %>%
+#   data.frame(word = rownames(freq_f)[.], Freq = freq_f[.,])
+# 
+# 
+# freq_m <- Corpus(VectorSource(male$text)) %>%
+#   DocumentTermMatrix() %>%
+#   as.matrix() %>% colSums() %>% data.frame()
+# freq_m <- order(freq_m$., decreasing = T) %>%
+#   data.frame(word = rownames(freq_m)[.], Freq = freq_m[.,])
 ```
 ```{r warning=FALSE}
 #merge the data with lower case word
