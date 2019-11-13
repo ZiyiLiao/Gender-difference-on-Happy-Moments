@@ -11,8 +11,14 @@ output:
 ```{r}
 library(tidytext)
 library(tm)
+library(plyr)
 library(dplyr)
 library(ggplot2)
+library(tidyr)
+library(readr)
+library(stringr)
+library(scales)
+library(tidytext)
 ```
 
 ```{r load libraries, warning=FALSE, message=FALSE}
@@ -38,7 +44,9 @@ hm_data <- read_csv("../data/output/processed_moments.csv")
 
 urlfile<-'https://raw.githubusercontent.com/rit-public/HappyDB/master/happydb/data/demographic.csv'
 demo_data <- read_csv(urlfile)
-
+```
+```{r}
+## Select the data
 happydb <- hm_data %>%
   inner_join(demo_data, by = "wid") %>%
   select(wid,
@@ -59,14 +67,14 @@ happydb <- hm_data %>%
   mutate(reflection_period = fct_recode(reflection_period, 
                                         months_3 = "3m", hours_24 = "24h"))
 
+
 #Merge the text data with demographic data into a CSV file
-write_csv(happydb, "../data/output/happydb.csv")
-#happydb = read.csv("../data/output/happydb.csv")
+#write_csv(happydb, "../data/output/happydb.csv")
+happydb = read.csv("../data/output/happydb.csv")
 
 #convert the structures of some variables
 happydb$age <- as.numeric(happydb$age)
 ```
-
 
 
 ## Part 1: What's the difference of the words in each gender group?
@@ -79,8 +87,7 @@ male <- happydb %>%
   filter(gender == 'm')
 
 urlfile<-'https://raw.githubusercontent.com/rit-public/HappyDB/master/happydb/data/senselabel.csv'
-sense_data <- read_csv(urlfile)
-sense_data
+sense_data <- read.csv(urlfile, stringsAsFactors = F)
 ```
 
 * Remove Stopwords
@@ -99,94 +106,115 @@ female_text <- female$text %>% as.vector()  %>%
   tibble(text = .) %>% 
   unnest_tokens(word, text) %>% 
   anti_join(stop_words)
-freq_f <- female_text %>% count(word, sort = TRUE) # count frequency and sort by descending order
 
 # males' answer word cleaning
 male_text <- male$text %>% as.vector()  %>% 
   tibble(text = .) %>% 
   unnest_tokens(word, text) %>% 
   anti_join(stop_words)
-freq_m <- male_text %>% count(word, sort = TRUE) # count frequency and sort by descending order
 ```
+
+#### Step 2: Word Frequency 
+
+* Each gender's word frequency
 ```{r}
+freq_f <- female_text %>% count(word, sort = TRUE) # count frequency and sort by descending order
+freq_m <- male_text %>% count(word, sort = TRUE) # count frequency and sort by descending order
+
 # visualize the frequency
 freq_f %>%
   filter(n > 1500) %>%
   mutate(word = reorder(word, n)) %>%
   ggplot(aes(word, n)) +
-  geom_col(colour = "pink") +
+  geom_col(fill = "pink") +
   xlab(NULL) +
+  ggtitle("Female word frequency")+
   coord_flip()
 
 freq_m %>%
   filter(n > 1500) %>%
   mutate(word = reorder(word, n)) %>%
   ggplot(aes(word, n)) +
-  geom_col(colour = "skyblue") +
+  geom_col(fill= "skyblue") +
   xlab(NULL) +
+  ggtitle("Male word frequency")+
   coord_flip()
 ```
+
+* Combination of gender word frequency
 ```{r}
-ggplot(frequency, aes(x = proportion, y = `Jane Austen`, color = abs(`Jane Austen` - proportion))) +
+# join each gender's word frequency 
+frequency <- bind_rows(mutate(freq_f, gender = "Female"),
+                       mutate(freq_m, gender = "Male")) %>%
+   mutate(word = str_extract(word, "[a-z']+")) %>%
+   count(gender, word) %>%
+   group_by(gender) %>%
+   mutate(proportion = n / sum(n)) %>%
+   select(-n) %>%  # delete n var
+   spread(gender, proportion) %>%  # word female male as columns
+   gather(gender, proportion, `Male`) %>% drop_na()
+```
+
+```{r}
+ggplot(frequency, aes(x = proportion, y = `Female`, color = abs(`Female` - proportion))) +
   geom_abline(color = "gray40", lty = 2) +
   geom_jitter(alpha = 0.1, size = 2.5, width = 0.3, height = 0.3) +
   geom_text(aes(label = word), check_overlap = TRUE, vjust = 1.5) +
   scale_x_log10(labels = percent_format()) +
   scale_y_log10(labels = percent_format()) +
   scale_color_gradient(limits = c(0, 0.001), low = "darkslategray4", high = "gray75") +
-  facet_wrap(~author, ncol = 2) +
+  facet_wrap(~gender, ncol = 2) +
   theme(legend.position="none") +
-  labs(y = "Jane Austen", x = NULL)
+  labs(y = "Female", x = NULL)
+```
+Words that are close to the line in these plots have similar frequencies in both sets of texts, which means there is no such similarity between females' response and males' response
+
+* Combine with position
+```{r}
+# combine with position 
+pos <- sense_data %>%
+  select(lowercaseLemma, POS) %>% 
+  rename(word = lowercaseLemma)  %>% 
+  unique()
+
+pos_f <- freq_f %>% inner_join(pos) %>% 
+  group_by(POS) %>% 
+  summarise(n = sum(n)) %>% 
+  mutate(proportion = n /sum(n))
+
+pos_m  <- freq_m %>% inner_join(pos)  %>% 
+  group_by(POS) %>% 
+  summarise(n= sum(n)) %>% 
+  mutate(proportion = n /sum(n))
+```
+
+```{r}
+pos_f %>%
+  mutate(POS = reorder(POS, proportion)) %>%
+  ggplot(aes(POS, proportion)) +
+  geom_col(fill = "pink") +
+  xlab(NULL) +
+  ggtitle("Female Part of Speech Proportion")+
+  coord_flip()
+
+pos_m %>%
+  mutate(POS = reorder(POS, proportion)) %>%
+  ggplot(aes(POS, proportion)) +
+  geom_col(fill = "skyblue") +
+  xlab(NULL) +
+  ggtitle("Male Part of Speech Proportion")+
+  coord_flip()
 ```
 
 
-```{r reorganize data, warning=FALSE}
-# freq_f<- Corpus(VectorSource(female$text)) %>%
-#   DocumentTermMatrix() %>%
-#   as.matrix() %>% colSums() %>% data.frame()
-# freq_f <- order(freq_f$., decreasing = T) %>%
-#   data.frame(word = rownames(freq_f)[.], Freq = freq_f[.,])
-# 
-# 
-# freq_m <- Corpus(VectorSource(male$text)) %>%
-#   DocumentTermMatrix() %>%
-#   as.matrix() %>% colSums() %>% data.frame()
-# freq_m <- order(freq_m$., decreasing = T) %>%
-#   data.frame(word = rownames(freq_m)[.], Freq = freq_m[.,])
-```
-```{r warning=FALSE}
-#merge the data with lower case word
-# what's the most frequently used POS in the top freq words?
-f_POS <- merge(freq_f,sense_data,by.x = 'word',by.y = 'lowercaseLemma')
-f_POS <- as.matrix(table(f_POS$POS))
+#### Sentiment Analysis
 
-m_POS <- merge(freq_m,sense_data,by.x = 'word',by.y = 'lowercaseLemma')
-m_POS <- as.matrix(table(m_POS$POS))
+```{r}
 
-#combine the female data and male data
-POS <- rbind(m_POS,f_POS)
-POS <- data_frame(word = rownames(POS), nums= POS, gender = c(rep('male',12),rep('female',12)))
 ```
 
-#### Step 2: Barplot 
-```{r barplot of POS}
-ggplot(POS)+
-  geom_bar(aes(x = POS$word, y = POS$nums), stat="identity", fill = 'darkseagreen') +
-  facet_grid(~gender)+
-  labs(titile = 'POS for different gender', x = 'Part of Speech', y = 'Frequency')
 
-# most frequently used 10 words for female
-ggplot(freq_f[1:10,], aes(fill = freq_f[1:10,]$word)) +
-  geom_bar(aes(x = reorder(freq_f[1:10,]$word, -freq_f[1:10,]$Freq), y = freq_f[1:10,]$Freq), stat="identity", fill = 'pink')+
-  labs(title='Most Frequently Used 10 Words For Female', y = 'Frequency', x = 'Words')
-
-# most frequently used 10 words for male
-ggplot(freq_m[1:10,], aes(fill = freq_m[1:10,]$word)) +
-  geom_bar(aes(x = reorder(freq_m[1:10,]$word,-freq_m[1:10,]$Freq), y = freq_m[1:10,]$Freq), stat="identity", fill = 'skyblue')+
-  labs(title='Most Frequently Used 10 Words For Male', y = 'Frequency', x = 'Words')
-```
-
-#### Step 3: WordCloud of text word
+ WordCloud of text word
 ```{r wordcloud}
 colorVec_f = rep(c('red', 'lightpink'), length.out=nrow(freq_f))
 wordcloud2(freq_f[1:100,2:3], color = colorVec_f, fontWeight = "bold",size=0.5, shape = 'cardioid', rotateRatio = 0.2)
