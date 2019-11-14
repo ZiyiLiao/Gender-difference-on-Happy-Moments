@@ -57,7 +57,7 @@ happydb <- hm_data %>%
 
 # Merge the text data with demographic data into a CSV file
 # write_csv(happydb, "../data/output/happydb.csv")
-happydb = read.csv("../data/output/happydb.csv")
+# happydb = read.csv("../data/output/happydb.csv")
 
 ```
 
@@ -415,7 +415,7 @@ After removing the most frequently used words in each group, the results show th
 # obtained sentiment
 bing = get_sentiments("bing")
 
-female_sentiment <- female_text %>% inner_join(bing)) %>%
+female_sentiment <- female_text %>% inner_join(bing) %>%
   count(word, sentiment, sort = TRUE) %>%
   ungroup()
 
