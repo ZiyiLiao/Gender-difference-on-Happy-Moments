@@ -8,8 +8,7 @@ output:
 
 ## Part 0: Clean the data
 #### Step 1. load the libraries 
-```{r}
-library(tidytext)
+```{r, message=FALSE}
 library(tm)
 library(plyr)
 library(dplyr)
@@ -20,27 +19,25 @@ library(stringr)
 library(scales)
 library(tidytext)
 library(textdata)
+library(ngram)
+library(forcats)
+library(syuzhet)
+library(wordcloud)
+library(reshape2)
 ```
 
 ```{r load libraries, warning=FALSE, message=FALSE}
-library(tidyverse)
-library(tidytext)
+
 library(DT)
-library(scales)
 
 library(gridExtra)
-library(tm)
+
 library(topicmodels)
-library(plyr)
-library(dplyr)
-library(syuzhet)
-library(ngram)
-library(devtools)
-library(wordcloud2)
 ```
 
 #### Step 2: Process the data
 ```{r message=FALSE, warning=FALSE}
+# This data is processed from Text_Pre-processing file
 hm_data <- read_csv("../data/output/processed_moments.csv")
 
 urlfile<-'https://raw.githubusercontent.com/rit-public/HappyDB/master/happydb/data/demographic.csv'
@@ -57,9 +54,9 @@ happydb <- hm_data %>%
          parenthood,
          reflection_period,
          age,
-         country, 
-         ground_truth_category, 
-         text) %>%
+         country,
+         cleaned_hm,
+         ground_truth_category) %>%
   mutate(count = sapply(hm_data$text, wordcount)) %>%
   filter(gender %in% c("m", "f")) %>%
   filter(marital %in% c("single", "married")) %>%
@@ -68,9 +65,8 @@ happydb <- hm_data %>%
   mutate(reflection_period = fct_recode(reflection_period, 
                                         months_3 = "3m", hours_24 = "24h"))
 
-
-#Merge the text data with demographic data into a CSV file
-#write_csv(happydb, "../data/output/happydb.csv")
+# Merge the text data with demographic data into a CSV file
+# write_csv(happydb, "../data/output/happydb.csv")
 happydb = read.csv("../data/output/happydb.csv")
 
 #convert the structures of some variables
@@ -102,14 +98,15 @@ stop_words <- stop_words %>%
   bind_rows(mutate(tibble(word), lexicon = "updated"))
 ```
 ```{r}
+
 # females' answer word cleaning
-female_text <- female$text %>% as.vector()  %>% 
+female_text <- female$cleaned_hm %>% as.vector()  %>% 
   tibble(text = .) %>% 
   unnest_tokens(word, text) %>% 
   anti_join(stop_words)
 
 # males' answer word cleaning
-male_text <- male$text %>% as.vector()  %>% 
+male_text <- male$cleaned_hm %>% as.vector()  %>% 
   tibble(text = .) %>% 
   unnest_tokens(word, text) %>% 
   anti_join(stop_words)
@@ -168,7 +165,7 @@ ggplot(frequency, aes(x = proportion, y = `Female`, color = abs(`Female` - propo
   theme(legend.position="none") +
   labs(y = "Female", x = NULL)
 ```
-Words that are close to the line in these plots have similar frequencies in both sets of texts, which means there is no such similarity between females' response and males' response
+Words that are close to the line in these plots have similar frequencies in both sets of texts, which means there is huge similarity between females' response and males' response
 
 * Combine with position
 ```{r}
@@ -210,37 +207,75 @@ pos_m %>%
 
 #### Sentiment Analysis
 
+* Positive vs. Negative
 ```{r}
 # obtained sentiment
-nrc = get_sentiments("nrc")
-library(syuzhet)
-# add a new column counting the difference between positive word count with negative word count
+bing = get_sentiments("bing")
 
-female_text %>%  left_join(bing, by = "word")  %>% count(word,sentiment) %>% spread(sentiment, n ,fill = 0) %>% mutate(sentiment = positive - negative)
+female_sentiment <- female_text %>% inner_join(bing)) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
 
-male_sentiment <- male_text %>%  inner_join(nrc, by = "word")  %>% count(word , sentiment) %>% spread(sentiment, n ,fill = 0) %>% mutate(sentiment = positive - negative)
-```
-```{r}
-male_sentiment
-```
-
-
-* Plot trajectory of each gender
-```{r}
-ggplot(female_sentiment, aes(word,sentiment, fill = word)) +
+female_sentiment %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
   geom_col(show.legend = FALSE) +
-  facet_wrap(~word, ncol = 2, scales = "free_x")
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(y = "Contribution to sentiment",
+       x = NULL) +
+  coord_flip()
+
+male_sentiment <- male_text %>% inner_join(bing) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  ungroup()
+
+male_sentiment %>%
+  group_by(sentiment) %>%
+  top_n(10) %>%
+  ungroup() %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(word, n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  facet_wrap(~sentiment, scales = "free_y") +
+  labs(y = "Contribution to sentiment",
+       x = NULL) +
+  coord_flip()
+
 ```
+The top 10 words in positive and negative aspect don't differ from each gender, just the order changed.
 
+* WordCloud of text word
+```{r}
+### General Word Cloud
 
- WordCloud of text word
-```{r wordcloud}
+# palatte
 colorVec_f = rep(c('red', 'lightpink'), length.out=nrow(freq_f))
-wordcloud2(freq_f[1:100,2:3], color = colorVec_f, fontWeight = "bold",size=0.5, shape = 'cardioid', rotateRatio = 0.2)
+
+freq_f %>% with(wordcloud(word, n, max.words = 100, colors =colorVec_f))
+
+# palatte
+colorVec_m = rep(c('blue', 'skyblue'), length.out=nrow(freq_m))
+
+freq_m %>% with(wordcloud(word, n, max.words = 100, colors =colorVec_m))
 ```
 ```{r}
-colorVec_m = rep(c('blue', 'skyblue'), length.out=nrow(freq_m))
-wordcloud2(freq_m[1:100,2:3], color = colorVec_m, fontWeight = "bold",size=0.5, shape = 'star', rotateRatio = 0.2)
+female_text %>%
+  inner_join(bing) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("grey20", "pink"),
+                   max.words = 100)
+
+
+male_text %>%
+  inner_join(bing) %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud(colors = c("gray20", "skyblue"),
+                   max.words = 100)
 ```
 
 #### Summary

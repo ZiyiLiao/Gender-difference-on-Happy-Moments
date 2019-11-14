@@ -24,10 +24,12 @@ From the packages' descriptions:
 + `DT` provides an R interface to the JavaScript library DataTables.
 
 ```{r load libraries, warning=FALSE, message=FALSE}
+library(dplyr)
 library(tm)
 library(tidytext)
 library(tidyverse)
 library(DT)
+
 ```
 
 ### Step 1 - Load the data to be cleaned and processed
@@ -78,7 +80,7 @@ We remove stopwords provided by the "tidytext" package and also add custom stopw
 data("stop_words")
 
 word <- c("happy","ago","yesterday","lot","today","months","month",
-                 "happier","happiest","last","week","past")
+                 "happier","happiest","last","week","past","day")
 
 stop_words <- stop_words %>%
   bind_rows(mutate(tibble(word), lexicon = "updated")) #add words in the stop_words and the level of lexicon is 'updated'
@@ -93,7 +95,7 @@ completed <- stemmed %>%
   mutate(id = row_number()) %>%
   unnest_tokens(stems, text) %>%
   bind_cols(dict) %>%
-  anti_join(stop_words, by = c("dictionary" = "word"))
+  anti_join(dplyr::row_number(), by = c("dictionary" = "word"))
 ```
 
 ### Step 7 - Stem completion
